@@ -1,5 +1,4 @@
-# docker
-DevOps를 위한 Docker 가상화 기술 (Private Harbor Registry) 학습
+# DevOps를 위한 Docker 가상화 기술 (Private Harbor Registry) 학습
 
 ## 학습 내용
 1. Microservice 애플리케이션을 배포하고 운영하기 위한 최선의 방법인 커네이너 가상화라는 기술에 대해 이해
