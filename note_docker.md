@@ -277,11 +277,11 @@ curl 명령어는 터미널 상태에서 http에 있는 특정 uri를 호출해�
 
 ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/4276ffb7-c264-452a-9db2-d3a98ad4ef2e/image.png)
 
-```docker
+```
 $ docker run -d -p 5000:5000 --restart always --name registry registry:2
 ```
 
-```docker
+```
 $ docker pull ubuntu
 $ docker tag ubuntu localhost:5000/ubuntu
 $ docker push localhost:5000/ubuntu
@@ -293,23 +293,194 @@ http://localhost:5000/v2/_catalog 로 접속하면 ubuntu를 확인 가능함
 
 이미지 태그명을 [도커허브아이디]/[이미지명]으로 작성해줘야한다
 
-```docker
+```
 docker tag nodejs-demo:latest cseon230/nodejs-demo:latest
 ```
 
 위와 같이 작성하면 cseon230/nodejs-demo 라는 이름을 가진 도커 이미지가 새로 생성된다
 
-```docker
+```
 docker push cseon230/nodejs-demo:latest
 ```
 
 이렇게 작성하면 docker hub에 해당 이미지가 업로드 되고,
 이미지를 다운받으려면, 아래와 같이 docker hub 아이디와 해당 이미지 명, 태그명까지 포함하여 pull 을 작성한다
 
-```docker
+```
 docker pull cseon230/nodejs-demo:latest
 ```
 
 
 # 4. Docker Network and Storage
 
+## Docker Network 구조 (1) - docker0와 container network 구조
+
+## 1. bridge
+
+도커 네트워크 중 bridge 네트워크는 가상 네트워크 인터페이스인 docker0 를 구현하여 네트워크 통신을 한다.
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/1085e1cb-0a67-4e2b-8fe5-db2044db4f4f/image.png)
+
+위 사진은 Docker의 network 구조를 간단히 도식화 한 것이다.
+
+### Docker0 interface
+
+docker를 설치 한 후 host의 network interface를 살펴보면, **docker0** 라는 virtual interface가 있는 것을 볼 수 있다. 아래는 docker를 설치한 host의 interface를 확인한 정보이다. 아래와 같이 docker0라는 interface를 확인할 수 있다.
+
+### Docker0 interface의 특징
+
+- IP는 자동으로 `172.17.0.1` 로 설정되며 16 bit netmask(255.255.0.0)로 설정됨
+- 이 IP는 DHCP를 통해 할당 받는 것은 아니며, docker 내부 로직에 의해 자동 할당 받는 것임
+(Docker 브리지는 기본적으로 `172.17.0.0/16` 범위에서 IP를 자동으로 할당함)
+- **docker0는 일반적인 interface가 아니며, virtual ethernet bridge이다.**
+
+> DHCP란?
+**Dynamic Host Configuration Protocol** 의 약자로, 네트워크 상에서 IP주소와 기타 네트워크 설정(서브넷 마스크, 게이트웨이, DNS서버)을 자동으로 할당해주는 프로토콜
+
+1. 컴퓨터 또는 디바이스가 네트워크에 연결되면 DHCP 서버가 그 디바이스에 사용할 수 있는 IP 주소를 임시로 할당함
+2. 이렇게 할당된 IP 주소는 일정 시간 동안 유효하며, 만료되면 갱신하거나 새 IP를 요청해야 한다
+
+DHCP의 장점
+1. 사용자가 네트워크 설정(IP 주소 등)을 수동으로 입력할 필요가 없어 간편함
+2. 네트워크 관리자가 IP 주소를 효율적으로 관리할 수 있음
+>
+
+Docker 네트워크 상태 확인
+
+```
+$ docker network ls
+```
+
+네트워크 상세 정보 보기
+
+```
+$ docker network inspect [network_name]
+```
+
+Docker 컨테이너가 생성되면 컨테이너 내부 네트워크와 docker0 브리지 네트워크를 연결하기 위해 veth(Virtual Ethernet) 페어가 생성된다.
+
+### veth 페어란?
+
+- veth 페어는 두 개의 가상 네트워크 인터페이스로 구성된 일종의 “가상 네트워크 케이블”이다.
+- 하나의 인터페이스는 컨테이너에 연결되고 다른 하나는 호스트(즉, docker0 브리지)에 연결된다.
+- 이 두 인터페이스는 서로 연결되어 있어, 한쪽에서 보낸 데이터를 다른 쪽에서 받을 수 있다.
+
+### Docker 컨테이너가 네트워크를 연결하는 과정
+
+1. 컨테이너 생성 → Docker는 컨테이너가 사용할 네트워크 네임스페이스를 생성함
+2. veth 페어 생성 → Docker는 하나의 veth 페어를 생성. (veth의 한쪽을 veth123, 다른 한쪽은 eth0라고 가정)
+3. veth 연결 → veth123은 호스트 네트워크의 docker0 브리지에 연결, eth0는 컨테이너의 네트워크 네임스페이스로 이동.
+4. IP 주소 할당 → Docker는 컨테이너의 eth0 인터페이스에 IP 주소를 할당.
+이 IP 주소는 docker0 브리지의 서브넷(172.17.0.0/16) 범위 내에서 할당
+5. 라우팅 설정 → 컨테이너 내부에서 eth0은 docker0 브리지를 게이트웨이로 사용하도록 라우팅이 설정됨.
+
+컨테이너 1: eth0 <-> veth12345 <-> docker0
+컨테이너 2: eth0 <-> veth67890 <-> docker0
+
+여기서, 컨테이너가 생성될때마다 veth 페어가 생성된다고 했는데 어째서 eth0가 공통으로 사용되는것처럼 보일까? eth0는 각 컨테이너 내부에서만 존재하며 독립적이기 때문에 모든 컨테이너 동일한 이름을 사용할 수 있는 것이다.
+
+네임스페이스와 veth를 활용한 격리 덕에 Docker 컨테이너는 독립적인 네트워크 환경을 유지할 수 있다.
+
+---
+
+## 2. host
+
+host 네트워크는 Docker 컨테이너가 호스트 네트워크 네임스페이스를 직접 사용하는 방식.
+
+host 방식으로 컨테이너를 생성하면, 컨테이너가 독립적인 네트워크 영역을 갖지 않고 host와 네트워크를 함께 사용하게 된다. 즉, 컨테이너 내부에서 설정된 IP주소가 없으며, 호스트의 IP 주소를 공유한다.
+
+컨테이너 생성 시 —net=host 옵션을 이용하면 된다.
+
+```
+$ docker run --network host [image]
+```
+
+Host 네트워크에서는 포트 매핑이 필요 없다. 컨테이너에서 사용하는 포트는 바로 호스트에서 사용된다.
+
+**성능 이점**
+
+- 네트워크 브리징, NAT 처리 등의 가상화 계층이 제거되므로 네트워크 성능이 더 우수함
+- 대용량 트래픽을 처리하거나 네트워크 성능이 중요한 어플리케이션에서 적합하다
+
+**격리성 감소**
+
+- 컨테이너와 호스트의 네트워크가 동일하므로, 컨테이너 내부에서 네트워크 설정을 변경하면 호스트 네트워크에도 영향을 미칠 수 있다
+- 보안상 더 주의가 필요하다
+
+host 네트워크를 사용하려면 컨테이너를 생성(run)할 때부터 네트워크를 설정해야 한다.
+
+이미 생성된 컨테이너에 대해서는 네트워크 모드를 변경할 수 없기 때문에, 새로운 컨테이너를 생성해야 한다.
+
+```
+$ docker run -d -it --network host ubuntu
+```
+
+```
+$ docker network inspect host
+```
+
+```
+[
+    {
+        "Name": "host",
+        "Id": "6d65e5ba10d615a8f02fbe54fc159480815bbcd4b1821b080200e9be58d447d0",
+        "Created": "2022-08-19T05:22:45.255646496Z",
+        "Scope": "local",
+        **"Driver": "host",**
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": null
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        **"Containers": {
+            "87da86d1b853173aa72f4510fcba84c04166f70d68c039dab8177eccf9776d81": {
+                "Name": "amazing_pike",
+                "EndpointID": "d816baad6c4cd2e5eeaf6f4478871a0aba92ea9e8808636d9b309f8069c70099",
+                "MacAddress": "",
+                "IPv4Address": "",
+                "IPv6Address": ""
+            }
+        },**
+        "Options": {},
+        "Labels": {}
+    }
+]
+
+```
+
+### **`eth0`가 Docker에서 어떤 역할을 하나요?**
+
+Docker 컨테이너 내부에서도 `eth0`는 네트워크 인터페이스로 사용됩니다. 컨테이너가 네트워크에 연결되면, Docker는 내부적으로 `eth0`라는 네트워크 인터페이스를 생성합니다.
+
+### **Bridge 네트워크에서:**
+
+- 컨테이너의 `eth0`는 호스트의 `docker0` 브리지에 연결됩니다.
+- 데이터 흐름:
+
+    ```
+    컨테이너 eth0 <-> veth <-> docker0 <-> 외부 네트워크
+    ```
+
+
+### **Host 네트워크에서:**
+
+- 컨테이너의 `eth0`는 호스트의 네트워크 인터페이스를 그대로 사용합니다.
+- 데이터 흐름:
+
+    ```
+    컨테이너 eth0 = 호스트 eth0
+    ```
+
+
+**컨테이너의 `eth0`와 호스트의 `eth0`가 동일한 네트워크 스택을 공유합니다.**
+
+- 컨테이너의 `eth0`는 **독립적인 인터페이스가 아니며**, 실제로는 호스트의 `eth0`와 완전히 동일한 네트워크 인터페이스를 사용합니다.
+- 즉, 컨테이너 내부에서 `eth0`를 통해 네트워크 통신을 하면, 이는 곧바로 호스트의 `eth0`를 통해 네트워크로 나가게 됩니다.
