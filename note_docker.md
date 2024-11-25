@@ -79,7 +79,7 @@ dockerfile 로 이미지를 만들고 그 이미지로 컨테이너화 시킨다
 
 ### Docker Container 명령어 - 1
 
-도커 컨테이너의 이해 
+도커 컨테이너의 이해
 
 - 도커 이미지를 실행한 상태를 “컨테이너” 라고 부른다. (메모리에 올라간 인스턴스를 뜻함)
 - 격리 된 시스템 자원 및 네트워크를 사용할 수 있는 독립적인 실행 단위
@@ -142,7 +142,7 @@ $ docker run -p 80:8080 <IMAGE NAME>
 $ docker run -p 80:80 nginx
 ```
 
-nginx는 기본적으로 80 이라는 포트를 가지고 서비스되고 있다. 주소창에 포트번호를 입력하지 않으면 기본적으로 80이라는 포트값이 설정된다. 
+nginx는 기본적으로 80 이라는 포트를 가지고 서비스되고 있다. 주소창에 포트번호를 입력하지 않으면 기본적으로 80이라는 포트값이 설정된다.
 
 **HTTP 프로토콜 포트 : 80**
 
@@ -187,3 +187,129 @@ $ docker run -d -p 3307:3306 -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=true --name my
 ```
 
 사용자가 3307 포트로 요청을 보내면 docker daemon이 그것을 3306으로 포워딩해준다. 컨테이너의 응답도 3306 포트에서 3307 포트로 반환된다.
+
+### 표준 포트
+
+- HTTP : 80
+- HTTPS : 403
+- MySQL / MariaDB : 3306
+
+### 비표준 포트
+
+표준 포트를 사용하지 않고, 개발자나 시스템이 필요에 따라 지정한 포트 번호. 개발 중 다른 서비스와 충돌을 피하기 위해 주로 사용
+
+- 리액트 개발 서버 : 3000 (리액트 개발 도구에서 기본적으로 사용하는 포트)
+
+### 요청 흐름 : 네트워크 요청 → 호스트 → 컨테이너
+
+```docker
+매핑이-p 3000:80 으로 되어있다고 가정
+```
+
+1. 네트워크 요청
+    - 클라이언트(브라우저or네트워크APP)에서 네트워크 요청이 들어온다
+    - ex ) `http://localhost:3000`
+2. 호스트 머신의 3000번 포트
+    - 도커는 -p 3000:80 으로 설정된 매핑 정보를 참조하여 호스트 머신의 3000번 포트로 들어온 요청을 처리함
+3. 호스트 머신과 컨테이너 간 네트워크
+    - 도커는 호스트 머신과 컨테이너 간의 가상 네트워크를 통해 요청을 컨테이너 내부로 전달
+    - 요청은 컨테이너 내부의 80번 포트로 포워딩 됨
+4. 컨테이너 내부의 80번 포트
+    - 컨테이너 내부에서 80번 포트를 수신 대기하고 있는 App(NGINX, Apache 등)이 요청을 처리.
+5. 응답 전달
+    - 애플리케이션이 생성한 응답은 컨테이너 내부의 80번 포트에서 다시 호스트의 3000번 포트로 전달되고, 최종적으로 클라이언트에 반환된다.
+
+
+
+# 3. Docker Essentials - Image
+
+운영 체제를 가지고 있는 단일 파일 = 이미지
+
+이미지는 컨테이너를 만드는 데에 필요한 ‘읽기 전용’ 상태의 템플릿
+
+컨테이너 실행에 필요한 파일과 설정 값 등을 포함하고 있지만 상태 값을 가지고 있지 않기 때문에 컨테이너화 해서 사용해야 한다.
+
+도커 이미지가 **제공**되는 곳을 **Registry** 라고 부른다.
+
+이미지가 **저장되는 저장소**를 **Repository** 라고 부른다.
+
+이미지를 가지고 와서 컨테이너 작업을 하기 위한 **Docker daemon**
+
+사용자는 **Docker CLI에서 명령어를 작성**하여 **Docker daemon 에게 명령**한다.
+
+### Docker Image 작성
+
+Dockerfile : 이미지 빌드용 DSL (Domain Specific Language) → 특정 도메인에 특화된 언어
+
+```docker
+$ touch Dockerfile
+$ vi Dockerfile
+```
+
+- touch : 비어있는 파일을 만드는 명령어
+- vi : 텍스트 편집 에디터 사용
+
+```docker
+FROM ubuntu:16.04
+```
+
+```docker
+$ docker build --tag [도커이미지명:태그명(버전,특징..)] -f Dockerfile .
+```
+
+도커 이미지를 빌드하는 명령어. 마지막에 들어가는 . 는 현재 디렉토리에 도커 파일이 있으니 여기서 찾아라 라는 의미.
+
+```docker
+$ docker image ls
+```
+
+```docker
+$ docker run -it first-image:0.1 bash
+```
+
+이미지로 도커 컨테이너 실행
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/38c10305-cc32-40b1-93c9-f876da0a7cb4/image.png)
+
+curl 명령어는 터미널 상태에서 http에 있는 특정 uri를 호출해서 결과를 볼 수 있는 명령어
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/bf547c0b-4298-48d7-9b78-a9231ef7c75e/image.png)
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/4276ffb7-c264-452a-9db2-d3a98ad4ef2e/image.png)
+
+```docker
+$ docker run -d -p 5000:5000 --restart always --name registry registry:2
+```
+
+```docker
+$ docker pull ubuntu
+$ docker tag ubuntu localhost:5000/ubuntu
+$ docker push localhost:5000/ubuntu
+```
+
+http://localhost:5000/v2/_catalog 로 접속하면 ubuntu를 확인 가능함
+
+도커 이미지를 docker hub에 업로드 하기 전에 도커허브에서 레포지토리를 만들어주고
+
+이미지 태그명을 [도커허브아이디]/[이미지명]으로 작성해줘야한다
+
+```docker
+docker tag nodejs-demo:latest cseon230/nodejs-demo:latest
+```
+
+위와 같이 작성하면 cseon230/nodejs-demo 라는 이름을 가진 도커 이미지가 새로 생성된다
+
+```docker
+docker push cseon230/nodejs-demo:latest
+```
+
+이렇게 작성하면 docker hub에 해당 이미지가 업로드 되고,
+이미지를 다운받으려면, 아래와 같이 docker hub 아이디와 해당 이미지 명, 태그명까지 포함하여 pull 을 작성한다
+
+```docker
+docker pull cseon230/nodejs-demo:latest
+```
+
+
+# 4. Docker Network and Storage
+
