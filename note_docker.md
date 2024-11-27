@@ -623,3 +623,48 @@ loopback 인터페이스는 그 의미대로 **내 컴퓨터에서 나간 신호
 namespace 과 cgroup 의 차이 ->
 namespace는 해당 프로세스가 볼 수 있는 범위를 제한한다
 cgroup은 해당 프로세스가 쓸 수 있는 사용량을 제한한다
+
+
+# Docker Volume Storage
+
+도커는 개별적인 가상화 환경이기 때문에 모든 데이터는 컨테이너 내부에 존재한다. 그 말은, 컨테이너가 삭제되면 작업했던 모든 데이터도 삭제된다는 뜻이다.
+
+**컨테이너 내부의 데이터를 외부로 연결시켜 주는 기능이다**
+
+Docker volume은 기본적으로 `/var/lib/docker/volumes/ (Docker Desktop) 디렉토리에 저장
+
+볼륨 리스트 보기
+
+```
+$ docker volume ls
+```
+
+볼륨 생성
+
+```
+$ docker volume create my-volume
+```
+
+볼륨 정보 
+
+```
+$ docker volume inspect my-volumeㅜ 
+```
+
+컨테이너 생성 시 volume 연결
+
+```
+$ docker run -v [생성볼륨명]:[컨테이너 내부 디렉토리 경로] --name [컨테이너명] [이미지명]
+```
+
+컨테이너 생성 시 생성한 볼륨과 연결
+
+```
+$ docker run --rm -it --network my-network -v ./docker_volume_test:/app/test ubuntu:16.04
+```
+
+`-v` : volume 생성을 의미
+
+`./docker_volume_test:/app/test` : 현재 디렉토리에 docker_volume_test 폴더를 만들고, 생성할 컨테이너 내부에 /app/test 를 만들어서 볼륨을 연결한다.
+
+볼륨을 연결해놓고 컨테이너를 삭제한 다음, 컨테이너를 다시 생성할 때 기존의 볼륨을 연결해도 데이터를 다시 불러올 수 있다.
