@@ -668,3 +668,6 @@ $ docker run --rm -it --network my-network -v ./docker_volume_test:/app/test ubu
 `./docker_volume_test:/app/test` : 현재 디렉토리에 docker_volume_test 폴더를 만들고, 생성할 컨테이너 내부에 /app/test 를 만들어서 볼륨을 연결한다.
 
 볼륨을 연결해놓고 컨테이너를 삭제한 다음, 컨테이너를 다시 생성할 때 기존의 볼륨을 연결해도 데이터를 다시 불러올 수 있다.
+
+
+# 5. Building and Managing Containerized Application
