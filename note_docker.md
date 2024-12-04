@@ -671,3 +671,104 @@ $ docker run --rm -it --network my-network -v ./docker_volume_test:/app/test ubu
 
 
 # 5. Building and Managing Containerized Application
+
+## Docker Compose
+
+Container 애플리케이션을 정의하고 실행하는 도구
+
+한 번에 여러 개의 컨테이너를 동시에 실행 → **각 컨테이너 별로 별로의 명령어 실행 가능**
+
+다른 컨테이너와의 접속을 쉽게 구성
+
+- 네트워크 연결을 위해 일일히 연결작업을 하지 않고도 쉽게 연결
+- 복잡한 설정을 쉽게 관리
+- Docker 생성, 설정 관련 된 작업을 작성해 놓은 Script 파일 사용 → Docker Compose 파일
+
+### Docker Compose 파일 작성
+
+- docker-compose.yml 파일
+
+```docker
+version: '3.1'
+
+service:
+			servicename:
+								image: # optional
+								command: # optional
+								environment: # optional
+								volumne: # optional
+			servicename2: # if have second service...
+volumes: # optional
+
+net
+```
+
+- `servicename`에는 중복되지 않은 컨테이너 이름 작성
+
+```docker
+$ docker-compose -f docker-compose1.yml up
+```
+
+- `up` 명령어로 Docker compose에 있는 서비스들을 한꺼번에 모두 실행. 하지만 일부 컨테이너만 실행하고 싶다면 실행하고자 하는 컨테이너의 이름을 작성해줌으로써 특정 컨테이너만 실행시킬수 있다.
+
+작동하고 있는 docker compose 를 조회하려면, 해당 dockerfile이 있는 디렉토리로 이동하여 아래의 명령어를 입력한다
+
+```docker
+$ docker-compose -f [도커파일명] ps
+```
+
+작동하고 있는 docker compose 를 중지하려면, 해당 dockerfile이 있는 디렉토리로 이동하여 아래의 명령어를 입력한다.
+
+```docker
+$ docker-compose -f [도커파일명] down
+```
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/38db5b2a-44f7-4be1-bf1a-fbbe1c0d90be/image.png)
+
+도커 컴포즈 안에서는, 컨테이너가 실행 될 때 병렬적으로 실행되므로 서비스 작성 순서는 중요하지 않다. 
+
+![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/cc7caccc-61bd-408a-bc03-e7716a418036/image.png)
+
+DB, 백엔드, 프론트엔드 서비스가 모두 컨테이너로 올라가는 docker compose 파일 작성
+
+```docker
+services:
+  my-db:
+    platform: linux/amd64 # for apple chip
+    image: mariadb:latest
+    environment: 
+      - MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=true
+      - MARIADB_DATABASE=mydb
+    ports:
+      - 3306:3306
+    volumes: 
+      # - C:\work\git\docker-examples\docker-compose\data:/var/lib/mysql # for windows
+      - /Users/choiseonha/study/inflearn/download/devops-docker/docker-compose/data:/var/lib/mysql
+    networks:
+      - my-network
+
+  my-backend:
+    image: edowon0623/my-backend:1.0
+    environment: 
+      - spring.datasource.url=jdbc:mariadb://my-db:3306/mydb
+      - spring.datasource.password=
+    ports:
+      - 8088:8088
+    depends_on:
+      - my-db
+    networks:
+      - my-network
+
+  my-frontend:
+    image: edowon0623/my-frontend:1.0
+    ports:
+      - 80:80
+    depends_on:
+      - my-db
+    networks:
+      - my-network
+
+networks:
+  my-network:
+    external: true
+```
