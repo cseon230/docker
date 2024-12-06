@@ -645,10 +645,10 @@ $ docker volume ls
 $ docker volume create my-volume
 ```
 
-볼륨 정보 
+볼륨 정보
 
 ```
-$ docker volume inspect my-volumeㅜ 
+$ docker volume inspect my-volumeㅜ
 ```
 
 컨테이너 생성 시 volume 연결
@@ -725,7 +725,7 @@ $ docker-compose -f [도커파일명] down
 
 ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/38db5b2a-44f7-4be1-bf1a-fbbe1c0d90be/image.png)
 
-도커 컴포즈 안에서는, 컨테이너가 실행 될 때 병렬적으로 실행되므로 서비스 작성 순서는 중요하지 않다. 
+도커 컴포즈 안에서는, 컨테이너가 실행 될 때 병렬적으로 실행되므로 서비스 작성 순서는 중요하지 않다.
 
 ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/cc7caccc-61bd-408a-bc03-e7716a418036/image.png)
 
@@ -736,12 +736,12 @@ services:
   my-db:
     platform: linux/amd64 # for apple chip
     image: mariadb:latest
-    environment: 
+    environment:
       - MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=true
       - MARIADB_DATABASE=mydb
     ports:
       - 3306:3306
-    volumes: 
+    volumes:
       # - C:\work\git\docker-examples\docker-compose\data:/var/lib/mysql # for windows
       - /Users/choiseonha/study/inflearn/download/devops-docker/docker-compose/data:/var/lib/mysql
     networks:
@@ -749,7 +749,7 @@ services:
 
   my-backend:
     image: edowon0623/my-backend:1.0
-    environment: 
+    environment:
       - spring.datasource.url=jdbc:mariadb://my-db:3306/mydb
       - spring.datasource.password=
     ports:
@@ -848,3 +848,98 @@ networks:
     3. 복잡한 애플리케이션 배포가 필요한 경우
 
 도커 Swarm 이라는 도커에서 기본으로 제공하는 Orchestration 도구가 존재하지만, Kubernetes를 학습할 예정이므로 Swarm은 스킵할 것
+
+
+# 7. Docker Security
+
+## Docker와 Cloud Native Application 보안
+
+> Cloud Native 의 종류 : MSA, Container화 된 가상화 기술, CI/CD, DevOps
+>
+
+## 1. Docker Daemon Security
+
+- 컨테이너 실행을 위한 Docker Engine(=daemon)에 대한 보안
+- Docker daemon(`dockerd`) 는 Root 권한을 가지고 실행되기 때문에 주의 깊은 보안 관리가 필요. 일반사용자 계정을 사용하거나 서비스에 필요한 계정을 별도로 만들어놓고 사용하는게 필요하다.
+- TLS(Transport Layer Security) 활성화(SSL, Https)
+
+## 2. Container Image Security
+
+- 컨테이너 이미지가 안전하게 생성 되었는지 검증 → 이미지에 대한 보안 취약성 문제점 확인
+- 보안 취약점 점검하기 위해 → Clair, Trivy, Docker Security Scanning 등 사용
+- 이미지 크기 최소화 → `alpine`이미지 등
+
+### Docker Scout
+
+- **이미지를 분석하여** SBOM (Software Bill of material, SW 자재명세) 라고 하는 **구성 요소 인벤토리를 컴파일**
+- **Docker Desktop, Docker Hub, Docker CLI, Docker Scout 대시보드와 상호 작용 가능한 독립적인 서비스 플랫폼**
+- **Docker Image 내 보안 위협 탐색**
+
+```java
+$ docker socut quickview cseon230/docker:latest
+```
+
+<!-- ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/985e3aa5-07f2-4ab9-a41b-972f474b6714/image.png) -->
+
+quickview의 결과로 edowon0623/docker:latest 이미지의 취약점을 나타냄. C는 Critical, H는 High, M은 Midium, L은 Low
+
+```java
+$ docker scout recommendations edowon0623/first-service
+```
+
+<!-- ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/de73abb8-cea7-406c-8a45-327513c0ce84/image.png) -->
+
+<!-- ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/de4ab037-8c71-404d-bc52-50c0dfdf2c2d/image.png) -->
+
+recommendations 는 보안취약점에 대한 문제점을 어떤식으로 해결할 수 있는지 대안이나 방법을 표기해주는 명령어
+
+aquasec을 사용한 이미지 취약점 검사
+
+```java
+$ docker run --rm -v ~/.cache/:/root/.cache aquasec/trivy:0.18.3 edowon0623/docker-server:m1
+
+```
+
+<!-- ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/6b922040-a4b7-4630-98cc-0c4bd79a53ca/23baaf63-fc29-453f-acf5-6bdde77746bb/image.png) -->
+
+## 3. Container Isolation
+
+컨테이너의 실행이 다른 컨테이너나 Host에 영향을 주지 않는 독립적인 실행 환경 → Isolation
+
+- 컨테이너와 호스트는 기본적으로 격리 → 무단 액세스를 방지 및 위험을 최소화 하기 위해 격리강화
+    - Namespace Isolation → 프로세스, 네트워킹, 파일 시스템을 경리
+    - Control Groups(cgroups) → 리소스를 보호하기 위해 CPU, Memory, I/O 리소스 제한
+
+```java
+$ docker run -it --cpus=".5" --memory="512MB" <이미지명>
+```
+
+`--cpus=".5"` : cpu를 0.5코어를 사용
+
+`memory="512MB"` : memory를 512MB 사용
+
+- 컨테이너 내의 사용자ID를 호스트의 다른 사용자 ID에 매핑하여 권한 상승 공격의 위험 감소
+
+> User Namespcae → Conatiner Root 사용자를 non-root 사용자(보안이 강화된 사용자) 와 매핑. Root사용자는 모든 권한을 가지기 때문에 특정한 작업만 가능하도록 하기 위해 Non-root 를 사용.
+>
+
+```java
+{
+	"userns-remap":"default"
+}
+```
+
+도커의 기본 네트워크 구성은 도커 네트워크 내에서 자유롭게  사용 가능. 컨테이너 간의 트래픽을 제한하기 위해 네트워크 세분화 및 방화벽 규칙 필요
+
+1. 사용자 정의 브리지 네트워크를 생서앟여 컨테이너 통신을 격리
+2. 격리 된 Docker Network 생성
+
+```java
+$ docker network create --driver bridge **isolated_network**
+```
+
+1. 격리 된 Docker Network에 컨테이너 연결
+
+```java
+$ docker run --network=**isolated_network** <이미지명>
+```
